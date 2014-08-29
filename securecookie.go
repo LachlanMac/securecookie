@@ -172,18 +172,42 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	}
 	b = encode(b)
 	// 3. Create MAC for "name|date|value". Extra pipe to be used later.
-	b = []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), b))
+	b = fmtmac(name, s.timestamp(), b)
 	mac := createMac(hmac.New(s.hashFunc, s.hashKey), b[:len(b)-1])
 	// Append mac, remove name.
 	b = append(b, mac...)[len(name)+1:]
+
 	// 4. Encode to base64.
-	b = encode(b)
+	//b = encode(b)
+	out := base64.URLEncoding.EncodeToString(b)
+
 	// 5. Check length.
-	if s.maxLength != 0 && len(b) > s.maxLength {
+	if s.maxLength != 0 && len(out) > s.maxLength {
 		return "", errors.New("securecookie: the value is too long")
 	}
 	// Done.
-	return string(b), nil
+	return out, nil
+}
+
+// equivalent to []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), val))
+func fmtmac(name string, time int64, val []byte) []byte {
+	tstr := strconv.FormatInt(time, 10)
+	tlen := len(name) + len(tstr) + len(val) + 3
+	out := make([]byte, tlen)
+	var n int
+	var nn int
+	nn = copy(out[n:], name)
+	n += nn
+	out[n] = '|'
+	n += 1
+	nn = copy(out[n:], tstr)
+	n += nn
+	out[n] = '|'
+	n += 1
+	nn = copy(out[n:], val)
+	n += nn
+	out[n] = '|'
+	return out
 }
 
 // Decode decodes a cookie value.

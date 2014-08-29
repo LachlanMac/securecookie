@@ -115,6 +115,24 @@ func TestSerialization(t *testing.T) {
 	}
 }
 
+func TestFmtMac(t *testing.T) {
+	tests := []struct {
+		Name string
+		Time int64
+		Val  []byte
+	}{
+		{"blah", 14093290, []byte("garbage")},
+	}
+
+	for _, ts := range tests {
+		got := string(fmtmac(ts.Name, ts.Time, ts.Val))
+		want := fmt.Sprintf("%s|%d|%s|", ts.Name, ts.Time, ts.Val)
+		if got != want {
+			t.Errorf("Got %q; wanted %q", got, want)
+		}
+	}
+}
+
 func TestEncoding(t *testing.T) {
 	for _, value := range testStrings {
 		encoded := encode([]byte(value))
