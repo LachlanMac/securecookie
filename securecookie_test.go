@@ -8,7 +8,6 @@ import (
 	"crypto/aes"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/gob"
 	"fmt"
 	"reflect"
 	"strings"
@@ -187,6 +186,13 @@ func TestDifferentCookies(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// register other garbage with both
+	// so we're sure that they don't have to
+	// share any other properties
+	two.Register(int(3))
+	two.Register("hello there")
+	one.Register(map[string]string{})
+
 	val, err := one.Encode("sid", src)
 	if err != nil {
 		t.Fatal(err)
@@ -213,7 +219,7 @@ func BenchmarkRoundtrip(b *testing.B) {
 	cook := New([]byte("12345"), []byte("1234567890123456"))
 
 	src := &FooBar{42, "bar"}
-	gob.Register(src)
+	cook.Register(src)
 
 	b.ResetTimer()
 	b.ReportAllocs()
