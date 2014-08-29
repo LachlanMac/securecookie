@@ -29,7 +29,7 @@ func TestSecureCookie(t *testing.T) {
 	s2 := New([]byte("54321"), []byte("6543210987654321"))
 	value := map[string]interface{}{
 		"foo": "bar",
-		"baz": float64(128),
+		"baz": 128,
 	}
 
 	for i := 0; i < 50; i++ {
@@ -74,7 +74,7 @@ func TestAuthentication(t *testing.T) {
 	}
 }
 
-func TestEncription(t *testing.T) {
+func TestEncryption(t *testing.T) {
 	block, err := aes.NewCipher([]byte("1234567890123456"))
 	if err != nil {
 		t.Fatalf("Block could not be created")
@@ -187,10 +187,16 @@ func TestDifferentCookies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	val, _ := one.Encode("sid", src)
+	val, err := one.Encode("sid", src)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// then do it again; make sure it's not "self-describing"
-	val, _ = one.Encode("sid", src)
+	val, err = one.Encode("sid", src)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	dst := &FooBar{}
 	err = two.Decode("sid", val, dst)
