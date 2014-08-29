@@ -178,16 +178,22 @@ func TestDifferentCookies(t *testing.T) {
 	two := New([]byte("12345"), []byte("1234567890123456"))
 
 	src := &FooBar{42, "bar"}
-	one.Register(src)
-	two.Register(src)
+	err := one.Register(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = two.Register(src)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	val, _ := one.Encode("sid", src)
 
-	// then do it again
+	// then do it again; make sure it's not "self-describing"
 	val, _ = one.Encode("sid", src)
 
 	dst := &FooBar{}
-	err := two.Decode("sid", val, dst)
+	err = two.Decode("sid", val, dst)
 	if err != nil {
 		t.Fatal(err)
 	}
