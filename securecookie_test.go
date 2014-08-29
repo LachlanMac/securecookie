@@ -100,12 +100,13 @@ func TestSerialization(t *testing.T) {
 		deserialized map[string]string
 		err          error
 	)
+	s := New([]byte("12345"), []byte("1234567890123456"))
 	for _, value := range testCookies {
-		if serialized, err = serialize(value); err != nil {
+		if serialized, err = serialize(s, value); err != nil {
 			t.Error(err)
 		} else {
 			deserialized = make(map[string]string)
-			if err = deserialize(serialized, &deserialized); err != nil {
+			if err = deserialize(s, serialized, &deserialized); err != nil {
 				t.Error(err)
 			}
 			if fmt.Sprintf("%v", deserialized) != fmt.Sprintf("%v", value) {
@@ -177,6 +178,8 @@ func TestDifferentCookies(t *testing.T) {
 	two := New([]byte("12345"), []byte("1234567890123456"))
 
 	src := &FooBar{42, "bar"}
+	one.Register(src)
+	two.Register(src)
 
 	val, _ := one.Encode("sid", src)
 
