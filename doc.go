@@ -25,11 +25,21 @@ of the encryption algorithm. For AES, used by default, valid lengths are
 
 Strong keys can be created using the convenience function GenerateRandomKey().
 
+Before using custom values with a cookie, they must be registered:
+
+	type MyType struct{
+		Foo int
+		Bar string
+	}
+
+	s.Register(&MyType{})
+
 Once a SecureCookie instance is set, use it to encode a cookie value:
 
 	func SetCookieHandler(w http.ResponseWriter, r *http.Request) {
-		value := map[string]string{
-			"foo": "bar",
+		value := MyType{
+			Foo: 42,
+			Bar: "bar",
 		}
 		if encoded, err := s.Encode("cookie-name", value); err == nil {
 			cookie := &http.Cookie{
@@ -46,8 +56,8 @@ value:
 
 	func ReadCookieHandler(w http.ResponseWriter, r *http.Request) {
 		if cookie, err := r.Cookie("cookie-name"); err == nil {
-			value := make(map[string]string)
-			if err = s2.Decode("cookie-name", cookie.Value, &value); err == nil {
+			value := &MyType{}
+			if err = s2.Decode("cookie-name", cookie.Value, value); err == nil {
 				fmt.Fprintf(w, "The value of foo is %q", value["foo"])
 			}
 		}
@@ -55,7 +65,6 @@ value:
 
 We stored a map[string]string, but secure cookies can hold any value that
 can be encoded using encoding/gob. To store custom types, they must be
-registered first using gob.Register(). For basic types this is not needed;
-it works out of the box.
+registered first using cookie.Register(<value>).
 */
 package securecookie
