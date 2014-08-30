@@ -14,4 +14,4 @@ The difference in performance comes from avoiding the re-allocation of the `gob.
 
 ### Documentation
 
-Full documentation at [godoc](http://godoc.org/philhofer/securecookie).
+Full documentation at [godoc](http://godoc.org/github.com/philhofer/securecookie).
