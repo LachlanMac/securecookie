@@ -1,6 +1,8 @@
 securecookie 2
 ============
 
+[![Build Status](https://travis-ci.org/philhofer/securecookie.svg)](https://travis-ci.org/philhofer/securecookie)
+
 This is a fork of [gorilla/securecookie](http://github.com/gorilla/securecookie) that addresses a non-trivial performance issue.
 
 |   Implementation       |  time/op  | mem/op   | allocs/op | 
