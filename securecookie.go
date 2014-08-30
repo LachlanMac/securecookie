@@ -189,27 +189,6 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	return out, nil
 }
 
-// equivalent to []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), val))
-func fmtmac(name string, time int64, val []byte) []byte {
-	tstr := strconv.FormatInt(time, 10)
-	tlen := len(name) + len(tstr) + len(val) + 3
-	out := make([]byte, tlen)
-	var n int
-	var nn int
-	nn = copy(out[n:], name)
-	n += nn
-	out[n] = '|'
-	n += 1
-	nn = copy(out[n:], tstr)
-	n += nn
-	out[n] = '|'
-	n += 1
-	nn = copy(out[n:], val)
-	n += nn
-	out[n] = '|'
-	return out
-}
-
 // Decode decodes a cookie value.
 //
 // It decodes, verifies a message authentication code, optionally decrypts and
@@ -231,18 +210,27 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 		return errors.New("securecookie: the value is too long")
 	}
 	// 2. Decode from base64.
-	b, err := decode([]byte(value))
+	b, err := base64.URLEncoding.DecodeString(value)
 	if err != nil {
 		return err
 	}
 	// 3. Verify MAC. Value is "date|value|mac".
-	parts := bytes.SplitN(b, []byte("|"), 3)
-	if len(parts) != 3 {
+	// parts := bytes.SplitN(b, []byte{'|'}, 3)
+	parts, err := pipesplit(b)
+	if len(parts) != 3 || err != nil {
 		return errors.New("securecookie: invalid value %v")
 	}
 	h := hmac.New(s.hashFunc, s.hashKey)
-	b = append([]byte(name+"|"), b[:len(b)-len(parts[2])-1]...)
-	if err = verifyMac(h, b, parts[2]); err != nil {
+
+	// replicate old MAC
+	// prepend "name" and add '|', then append "value" part
+	cs := make([]byte, len(name)+len(b)-len(parts[2]))
+	nn := copy(cs, name)
+	cs[nn] = '|'
+	nn += 1
+	copy(cs[nn:], b[:len(b)-len(parts[2])-1])
+
+	if err = verifyMac(h, cs, parts[2]); err != nil {
 		return err
 	}
 	// 4. Verify date ranges.
@@ -380,12 +368,66 @@ func encode(value []byte) []byte {
 
 // decode decodes a cookie using base64.
 func decode(value []byte) ([]byte, error) {
+	tl := base64.URLEncoding.DecodedLen(len(value))
+	if tl <= cap(value) {
+		scratch := make([]byte, tl)
+		b, err := base64.URLEncoding.Decode(scratch, value)
+		if err != nil {
+			return nil, err
+		}
+		copy(value[0:cap(value)], scratch)
+		return value[:b], nil
+	}
 	decoded := make([]byte, base64.URLEncoding.DecodedLen(len(value)))
 	b, err := base64.URLEncoding.Decode(decoded, value)
 	if err != nil {
 		return nil, err
 	}
 	return decoded[:b], nil
+}
+
+// split on pipes
+func pipesplit(val []byte) (out [3][]byte, err error) {
+	var off int
+	for i := 0; i < 2; i++ {
+		var loc int
+		for j, bt := range val[off:] {
+			if bt == '|' {
+				loc = off + j
+				break
+			}
+		}
+		// not found
+		if loc == 0 {
+			err = errors.New("bad mac")
+			return
+		}
+		out[i] = val[off:loc]
+		off = loc + 1
+	}
+	out[2] = val[off:]
+	return
+}
+
+// equivalent to []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), val))
+func fmtmac(name string, time int64, val []byte) []byte {
+	tstr := strconv.FormatInt(time, 10)
+	tlen := len(name) + len(tstr) + len(val) + 3
+	out := make([]byte, tlen)
+	var n int
+	var nn int
+	nn = copy(out[n:], name)
+	n += nn
+	out[n] = '|'
+	n += 1
+	nn = copy(out[n:], tstr)
+	n += nn
+	out[n] = '|'
+	n += 1
+	nn = copy(out[n:], val)
+	n += nn
+	out[n] = '|'
+	return out
 }
 
 // Helpers --------------------------------------------------------------------

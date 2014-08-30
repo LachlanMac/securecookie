@@ -133,6 +133,26 @@ func TestFmtMac(t *testing.T) {
 	}
 }
 
+func TestPipesplit(t *testing.T) {
+	tests := []struct {
+		In  string
+		Out [3][]byte
+	}{
+		{"a|b|c", [3][]byte{[]byte("a"), []byte("b"), []byte("c")}},
+		{"a_thing|another_thing here!|blah blah blah", [3][]byte{[]byte("a_thing"), []byte("another_thing here!"), []byte("blah blah blah")}},
+	}
+
+	for _, test := range tests {
+		got, err := pipesplit([]byte(test.In))
+		if err != nil {
+			t.Error(err)
+		}
+		if !reflect.DeepEqual(got, test.Out) {
+			t.Errorf("Wanted %v; got %v", test.Out, got)
+		}
+	}
+}
+
 func TestEncoding(t *testing.T) {
 	for _, value := range testStrings {
 		encoded := encode([]byte(value))
