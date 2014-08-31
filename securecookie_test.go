@@ -179,13 +179,13 @@ func TestMultiError(t *testing.T) {
 
 func TestMultiNoCodecs(t *testing.T) {
 	_, err := EncodeMulti("foo", "bar")
-	if err != errNoCodecs {
+	if err != ErrNoCodecs {
 		t.Errorf("EncodeMulti: bad value for error, got: %v", err)
 	}
 
 	var dst []byte
 	err = DecodeMulti("foo", "bar", &dst)
-	if err != errNoCodecs {
+	if err != ErrNoCodecs {
 		t.Errorf("DecodeMulti: bad value for error, got: %v", err)
 	}
 }
@@ -196,6 +196,14 @@ type FooBar struct {
 	Foo int
 	Bar string
 }
+
+// for testing the Coder interface
+type TestCoder struct {
+	Str string
+}
+
+func (t *TestCoder) Marshal() ([]byte, error) { return []byte(t.Str), nil }
+func (t *TestCoder) Unmarshal(b []byte) error { t.Str = string(b); return nil }
 
 func TestCustomType(t *testing.T) {
 	s1 := New([]byte("12345"), []byte("1234567890123456"))
@@ -253,6 +261,25 @@ func TestDifferentCookies(t *testing.T) {
 	}
 }
 
+func TestOverride(t *testing.T) {
+	obj := TestCoder{
+		Str: "hello",
+	}
+
+	c := New([]byte("12345"), []byte("1234567890123456"))
+
+	out, err := c.Encode("blah", &obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var res TestCoder
+	err = c.Decode("blah", out, &res)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func BenchmarkRoundtrip(b *testing.B) {
 	cook := New([]byte("12345"), []byte("1234567890123456"))
 
@@ -269,6 +296,26 @@ func BenchmarkRoundtrip(b *testing.B) {
 			b.Fatal(err)
 		}
 		err = cook.Decode("sid", val, src)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkRoundtripOverride(b *testing.B) {
+	cook := New([]byte("12345"), []byte("1234567890123456"))
+	val := TestCoder{Str: "hello!"}
+
+	var err error
+	var v string
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		v, err = cook.Encode("blah", &val)
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = cook.Decode("blah", v, &val)
 		if err != nil {
 			b.Fatal(err)
 		}

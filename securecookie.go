@@ -24,16 +24,27 @@ import (
 )
 
 var (
-	errNoCodecs      = errors.New("securecookie: no codecs provided")
-	errHashKeyNotSet = errors.New("securecookie: hash key is not set")
-
-	ErrMacInvalid = errors.New("securecookie: the value is not valid")
+	ErrNoCodecs      = errors.New("securecookie: no codecs provided")
+	ErrHashKeyNotSet = errors.New("securecookie: hash key is not set")
+	ErrMacInvalid    = errors.New("securecookie: the value is not valid")
+	ErrTimeInvalid   = errors.New("securecookie: invalid timestamp")
+	ErrNoBlockKey    = errors.New("securecookie: no block key set")
+	ErrTooLong       = errors.New("securecookie: value too long")
+	ErrExpired       = errors.New("securecookie: expired")
+	ErrTooNew        = errors.New("securecookie: timestamp too new")
 )
 
 // Codec defines an interface to encode and decode cookie values.
 type Codec interface {
 	Encode(name string, value interface{}) (string, error)
 	Decode(name, value string, dst interface{}) error
+}
+
+// Objects passed to Encode and Decode that satisfy
+// the Coder interface override the standard gob encoding.
+type Coder interface {
+	Marshal() ([]byte, error)
+	Unmarshal([]byte) error
 }
 
 // New returns a new SecureCookie.
@@ -56,7 +67,7 @@ func New(hashKey, blockKey []byte) *SecureCookie {
 	s.enc = gob.NewEncoder(&s.buf)
 	s.dec = gob.NewDecoder(&s.buf)
 	if hashKey == nil {
-		s.err = errHashKeyNotSet
+		s.err = ErrHashKeyNotSet
 	}
 	if blockKey != nil {
 		s.BlockFunc(aes.NewCipher)
@@ -132,7 +143,7 @@ func (s *SecureCookie) HashFunc(f func() hash.Hash) *SecureCookie {
 // Default is crypto/aes.New.
 func (s *SecureCookie) BlockFunc(f func([]byte) (cipher.Block, error)) *SecureCookie {
 	if s.blockKey == nil {
-		s.err = errors.New("securecookie: block key is not set")
+		s.err = ErrNoBlockKey
 	} else if block, err := f(s.blockKey); err == nil {
 		s.block = block
 	} else {
@@ -155,13 +166,18 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 		return "", s.err
 	}
 	if s.hashKey == nil {
-		s.err = errHashKeyNotSet
+		s.err = ErrHashKeyNotSet
 		return "", s.err
 	}
 	var err error
 	var b []byte
 	// 1. Serialize.
-	if b, err = serialize(s, value); err != nil {
+	if enc, ok := value.(Coder); ok {
+		b, err = enc.Marshal()
+	} else {
+		b, err = serialize(s, value)
+	}
+	if err != nil {
 		return "", err
 	}
 	// 2. Encrypt (optional).
@@ -183,7 +199,7 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 
 	// 5. Check length.
 	if s.maxLength != 0 && len(out) > s.maxLength {
-		return "", errors.New("securecookie: the value is too long")
+		return "", ErrTooLong
 	}
 	// Done.
 	return out, nil
@@ -202,12 +218,12 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 		return s.err
 	}
 	if s.hashKey == nil {
-		s.err = errHashKeyNotSet
+		s.err = ErrHashKeyNotSet
 		return s.err
 	}
 	// 1. Check length.
 	if s.maxLength != 0 && len(value) > s.maxLength {
-		return errors.New("securecookie: the value is too long")
+		return ErrTooLong
 	}
 	// 2. Decode from base64.
 	b, err := base64.URLEncoding.DecodeString(value)
@@ -218,7 +234,7 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	// parts := bytes.SplitN(b, []byte{'|'}, 3)
 	parts, err := pipesplit(b)
 	if len(parts) != 3 || err != nil {
-		return errors.New("securecookie: invalid value %v")
+		return ErrMacInvalid
 	}
 	h := hmac.New(s.hashFunc, s.hashKey)
 
@@ -236,14 +252,14 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	// 4. Verify date ranges.
 	var t1 int64
 	if t1, err = strconv.ParseInt(string(parts[0]), 10, 64); err != nil {
-		return errors.New("securecookie: invalid timestamp")
+		return ErrTimeInvalid
 	}
 	t2 := s.timestamp()
 	if s.minAge != 0 && t1 > t2-s.minAge {
-		return errors.New("securecookie: timestamp is too new")
+		return ErrTooNew
 	}
 	if s.maxAge != 0 && t1 < t2-s.maxAge {
-		return errors.New("securecookie: expired timestamp")
+		return ErrExpired
 	}
 	// 5. Decrypt (optional).
 	b, err = decode(parts[1])
@@ -256,11 +272,12 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 		}
 	}
 	// 6. Deserialize.
-	if err = deserialize(s, b, dst); err != nil {
-		return err
+	if dec, ok := dst.(Coder); ok {
+		err = dec.Unmarshal(b)
+	} else {
+		err = deserialize(s, b, dst)
 	}
-	// Done.
-	return nil
+	return err
 }
 
 // timestamp returns the current timestamp, in seconds.
@@ -399,7 +416,7 @@ func pipesplit(val []byte) (out [3][]byte, err error) {
 		}
 		// not found
 		if loc == 0 {
-			err = errors.New("bad mac")
+			err = ErrMacInvalid
 			return
 		}
 		out[i] = val[off:loc]
@@ -462,7 +479,7 @@ func CodecsFromPairs(keyPairs ...[]byte) []Codec {
 // key rotation.
 func EncodeMulti(name string, value interface{}, codecs ...Codec) (string, error) {
 	if len(codecs) == 0 {
-		return "", errNoCodecs
+		return "", ErrNoCodecs
 	}
 
 	var errors MultiError
@@ -482,7 +499,7 @@ func EncodeMulti(name string, value interface{}, codecs ...Codec) (string, error
 // key rotation.
 func DecodeMulti(name string, value string, dst interface{}, codecs ...Codec) error {
 	if len(codecs) == 0 {
-		return errNoCodecs
+		return ErrNoCodecs
 	}
 
 	var errors MultiError
