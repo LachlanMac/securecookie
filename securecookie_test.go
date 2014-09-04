@@ -218,6 +218,38 @@ func TestCustomType(t *testing.T) {
 	}
 }
 
+func TestBackwardsCompatibility(t *testing.T) {
+	oldCookie := New([]byte("12345"), []byte("1234567890123456"))
+	newCookie := New([]byte("12345"), []byte("1234567890123456"))
+
+	// This test is pretty straightforward - if we don't
+	// Register a value, then the encoding will include
+	// the wire type annotations that it used to in the
+	// old implementation.
+
+	// TODO: uncommenting this line
+	// makes the test fail on line 244
+	// with "extra data in buffer"
+	//newCookie.Register(&FooBar{})
+
+	in := &FooBar{4000, "4000"}
+	out := &FooBar{}
+
+	bts, err := oldCookie.Encode("A-Cookie", in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = newCookie.Decode("A-Cookie", bts, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if (*in) != (*out) {
+		t.Fatalf("Values %v and %v not equal.", in, out)
+	}
+}
+
 func TestDifferentCookies(t *testing.T) {
 	one := New([]byte("12345"), []byte("1234567890123456"))
 	two := New([]byte("12345"), []byte("1234567890123456"))
