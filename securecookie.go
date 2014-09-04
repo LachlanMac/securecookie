@@ -403,22 +403,18 @@ func decode(value []byte) ([]byte, error) {
 	return decoded[:b], nil
 }
 
-// split on pipes
+// split on '|' - find two; return beginning, middle, end
 func pipesplit(val []byte) (out [3][]byte, err error) {
 	var off int
 	for i := 0; i < 2; i++ {
 		var loc int
-		for j, bt := range val[off:] {
-			if bt == '|' {
-				loc = off + j
-				break
-			}
-		}
-		// not found
-		if loc == 0 {
+		j := bytes.IndexByte(val[off:], '|')
+		// not found (or double pipe...)
+		if j == 0 {
 			err = ErrMacInvalid
 			return
 		}
+		loc = off + j
 		out[i] = val[off:loc]
 		off = loc + 1
 	}
