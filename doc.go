@@ -1,4 +1,5 @@
 // Copyright 2012 The Gorilla Authors. All rights reserved.
+// Portions copyright 2014 Philip Hofer.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 

@@ -6,7 +6,7 @@ securecookie 2
 This is a fork of [gorilla/securecookie](http://github.com/gorilla/securecookie) that addresses a non-trivial performance issue:
 
 |   Implementation       |  time/op  | mem/op   | allocs/op | 
-| ---------------------- |:---------:|:--------:|:---------:|
+|:----------------------:|:---------:|:--------:|:---------:|
 | gorilla/securecookie   | 75,275 ns | 21,396 B |    369    |
 | philhofer/securecookie | 17,483 ns | 3,198 B  |     33    |
 |       *delta*          |   -76.7%  |  -85.0%  |   -91.0%  |
