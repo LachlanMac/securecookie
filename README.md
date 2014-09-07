@@ -12,8 +12,7 @@ This is a fork of [gorilla/securecookie](http://github.com/gorilla/securecookie)
 |       *delta*          |   -76.7%  |  -85.0%  |   -91.0%  |
 
 
-The difference in performance comes from avoiding the re-allocation of the `gob.Encoder` and `gob.Decoder` types. In order to accomodate this change, a backwards-incompatible change had to be made to the API: all used types need to be `Register()`ed with a new cookie in order for it to properly handle gob-encoded values from other cookies. The previous implementation may not be able to decode 
-cookies created by the new implementation, but this implementation is still able to decode "old" cookies.
+The difference in performance comes from avoiding the re-allocation of the `gob.Encoder` and `gob.Decoder` types. In order to accomodate this change, a backwards-incompatible change had to be made to the API: all used types need to be `Register()`ed with a new cookie in order for it to properly handle gob-encoded values from other cookies. This implementation will not be able to decode "old" cookies, as `encoding/gob` treats extra data (superfluous type annotations) as an error.
 
 ### Documentation
 
